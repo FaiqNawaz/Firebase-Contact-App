@@ -2,49 +2,70 @@ import React, { useEffect, useState } from "react";
 import Navbar from "./components/Navbar";
 import { FiSearch } from "react-icons/fi";
 import { AiFillPlusCircle } from "react-icons/ai";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "./config/firebase";
 import ContactCard from "./components/ContactCard";
 import AddAndUpdateContact from "./components/AddAndUpdateContact";
+import crudHook from "./hooks/crudHook";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import ContactNotFound from "./components/ContactNotFound";
 
 const App = () => {
   const [conatcts, setContacts] = useState([]);
 
-  const [isOpen, setOpen] = useState(false);
-
-  const onOpen = () => {
-    setOpen(true);
-  };
-
-  const onClose = () => {
-    setOpen(false);
-  };
+  const { isOpen, onOpen, onClose } = crudHook();
 
   useEffect(() => {
     const getContacts = async () => {
       try {
         const conatcsRef = collection(db, "contacts");
 
-        const contactsSnapshot = await getDocs(conatcsRef);
+        onSnapshot(conatcsRef, (snapshot) => {
+          const contactsList = snapshot.docs.map((doc) => {
+            return {
+              id: doc.id,
+              ...doc.data(),
+            };
+          });
 
-        const contactsList = contactsSnapshot.docs.map((doc) => {
-          return {
-            id: doc.id,
-            ...doc.data(),
-          };
+          setContacts(contactsList);
+          return contactsList;
         });
-
-        // console.log(contactsList);
-        setContacts(contactsList);
-      } catch (error) {}
+      } catch (error) {
+        console.log(error);
+      }
     };
 
     getContacts();
   }, []);
 
+  const filterContacts = (e) => {
+    const value = e.target.value;
+
+    const conatcsRef = collection(db, "contacts");
+
+    onSnapshot(conatcsRef, (snapshot) => {
+      const contactsList = snapshot.docs.map((doc) => {
+        return {
+          id: doc.id,
+          ...doc.data(),
+        };
+      });
+
+      const filteredContacts = contactsList.filter((contact) =>
+        contact.Name.toLowerCase().includes(value.toLowerCase())
+      );
+
+      setContacts(filteredContacts);
+
+      return filteredContacts;
+    });
+  };
+
   return (
     <>
-      <div className="max-w-[370px] mx-auto">
+      <div className="max-w-[420px] mx-auto">
         <Navbar />
 
         <div>
@@ -53,27 +74,34 @@ const App = () => {
               <FiSearch className="text-white text-3xl absolute ml-2" />
 
               <input
+                onChange={filterContacts}
                 type="text"
                 className=" pl-10 bg-transparent border border-white rounded-md h-10 flex-grow text-white"
-                placeholder="search contacts"
+                placeholder="Search Contacts"
               ></input>
             </div>
 
             <AiFillPlusCircle
               onClick={onOpen}
-              className="text-5xl text-white cursor-pointer"
+              className="text-5xl text-orange cursor-pointer"
             />
           </div>
         </div>
 
         <div className="mt-4 gap-4 flex flex-col">
-          {conatcts.map((contact) => (
-            <ContactCard key={contact.id} contact={contact} />
-          ))}
+          {conatcts.length <= 0 ? (
+            <ContactNotFound />
+          ) : (
+            conatcts.map((contact) => (
+              <ContactCard key={contact.id} contact={contact} />
+            ))
+          )}
         </div>
       </div>
 
       <AddAndUpdateContact isOpen={isOpen} onClose={onClose} />
+
+      <ToastContainer position="bottom-center" />
     </>
   );
 };
